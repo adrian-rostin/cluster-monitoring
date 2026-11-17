@@ -17,6 +17,9 @@ spec:
     # Die zusätzliche NetworkPolicy liegt in 'altsetter'
     - server: https://kubernetes.default.svc
       namespace: altsetter
+    # kube-prometheus-stack legt Exporter-Services (z. B. coredns) in kube-system an
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
