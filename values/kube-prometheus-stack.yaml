@@ -187,9 +187,9 @@ grafana:
       auth_url: https://github.com/login/oauth/authorize
       token_url: https://github.com/login/oauth/access_token
       api_url: https://api.github.com/user
-      # adrian-rostin = GrafanaAdmin, jan-herzog = Viewer (nur ansehen),
+      # adrian-rostin = GrafanaAdmin (Server-Admin), jan-herzog = Admin (Org-Admin),
       # alle anderen bekommen keine Rolle -> abgewiesen.
-      role_attribute_path: "login == 'adrian-rostin' && 'GrafanaAdmin' || login == 'jan-herzog' && 'Viewer' || ''"
+      role_attribute_path: "login == 'adrian-rostin' && 'GrafanaAdmin' || login == 'jan-herzog' && 'Admin' || ''"
       role_attribute_strict: true     # keine Rolle => Zugriff verweigert
       allow_assign_grafana_admin: true
     users:
