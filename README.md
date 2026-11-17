@@ -1,7 +1,7 @@
 # cluster-monitoring
 
 Monitoring-Stack für meinen k3s-Single-Node-Cluster: Metriken, Logs, Dashboards
-und Alerting – alles als Code, vorbereitet für die spätere Übernahme in Argo CD.
+und Alerting – alles als Code und per **Argo CD (GitOps)** verwaltet.
 
 ## Was ist drin
 
@@ -78,9 +78,10 @@ Teilschritte: `./install.sh secrets|charts|manifests`.
 
 ## Login / Zugriff
 
-- Grafana: **nur GitHub-Login**, kein Passwort-Formular. Nur der Account
-  `adrian-rostin` wird Admin (`role_attribute_strict: true` → andere Accounts
-  werden trotz gültigem GitHub-Login abgewiesen).
+- Grafana: **nur GitHub-Login**, kein Passwort-Formular, auch keine HTTP-Basic-Auth
+  auf der API (`auth.basic.enabled: false`). Rollen: `adrian-rostin` = GrafanaAdmin,
+  `jan-herzog` = Admin; `role_attribute_strict: true` → alle anderen werden trotz
+  gültigem GitHub-Login abgewiesen. Weitere Nutzer: in `role_attribute_path` ergänzen.
 
 ### Notfallzugang (wenn GitHub-Login nicht geht)
 
@@ -136,10 +137,28 @@ Monitoring-Volume > 85 %. Alertmanager hat vorerst nur den `null`-Receiver
 - Keine Metrik-Labels mit IPs/User-IDs/Suchbegriffen (Micrometer-URIs sind getemplatet).
 - Grafana: kein Gravatar, kein Usage-Reporting, kein Self-Signup.
 
+## GitOps (Argo CD)
+
+Das Monitoring wird von **Argo CD** (Namespace `argocd`, v3.6.1) aus diesem Repo
+verwaltet – privates Repo `github.com/adrian-rostin/cluster-monitoring`, Zugriff
+über einen **read-only Deploy-Key** (SSH). Vier Applications
+(`kube-prometheus-stack`, `loki`, `alloy`, `altsetter-monitoring-manifests`) mit
+`automated`-Sync (`prune` + `selfHeal`).
+
+**Änderungen laufen jetzt über Git:** bearbeiten → committen → `git push` → Argo
+zieht sie automatisch nach. `install.sh`/`helm` sind nur noch fürs Erst-Bootstrap.
+Details in `argocd/README.md`.
+
+Argo-UI (kein Ingress, nur intern per Port-Forward):
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+# Browser: https://localhost:8080  (User: admin)
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
 ## Nächste Schritte
 
-- **Argo CD (GitOps):** Repo auf GitHub pushen, `argocd/`-Manifeste anpassen und
-  anwenden (siehe `argocd/README.md`). Monitoring als erste Argo-Application.
 - Cloudflare Access vor `grafana.adrianrostin.de` (Allow-Liste E-Mail/GitHub).
 - Discord-Receiver im Alertmanager aktivieren.
 - Gatus als öffentliche Statusseite `status.adrianrostin.de`.
