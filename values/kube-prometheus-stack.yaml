@@ -180,6 +180,8 @@ grafana:
       domain: grafana.adrianrostin.de
     auth:
       disable_login_form: true        # kein Passwort-Login über die Website
+    auth.basic:
+      enabled: false                  # keine HTTP-Basic-Auth auf der API (nur GitHub)
     auth.github:
       enabled: true
       allow_sign_up: true             # nötig, damit adrian beim 1. Login angelegt wird
