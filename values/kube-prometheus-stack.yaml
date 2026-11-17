@@ -130,12 +130,14 @@ kube-state-metrics:
 grafana:
   enabled: true
   defaultDashboardsTimezone: Europe/Berlin
+  # Grafana 13 (distroless) braucht beim Start spürbar mehr RAM (apiserver/
+  # unified storage) – 256Mi führten zu OOM-Kill (exit 137).
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
-    limits:
       memory: 256Mi
+    limits:
+      memory: 512Mi
 
   # Notfallzugang: zufälliges Admin-Passwort im Secret 'grafana-admin'
   # (wird vom install.sh erzeugt). Siehe README -> Notfallzugang.
