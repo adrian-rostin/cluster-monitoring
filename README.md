@@ -9,7 +9,7 @@ und Alerting – alles als Code, vorbereitet für die spätere Übernahme in Arg
 |---|---|---|---|
 | kube-prometheus-stack | Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics | `prometheus-community/kube-prometheus-stack` | 93.3.1 |
 | Loki | Logspeicher (14 Tage Aufbewahrung) | `grafana-community/loki` | 21.3.1 |
-| Alloy | sammelt Pod-Logs über die Kubernetes-API | `grafana/alloy` | 1.16.0 |
+| Alloy | sammelt Pod-Logs (Namespaces `altsetter` + `monitoring`) über die Kubernetes-API | `grafana/alloy` | 1.16.0 |
 
 Alles läuft im Namespace `monitoring`. Grafana ist unter
 `https://grafana.adrianrostin.de` erreichbar (TLS per cert-manager, Login nur über GitHub).
@@ -129,6 +129,7 @@ Monitoring-Volume > 85 %. Alertmanager hat vorerst nur den `null`-Receiver
 ## Datenschutz-Leitplanken
 
 - **Keine Zugriffsprotokolle:** Traefik-Pods werden von Alloy nicht eingesammelt.
+- **Log-Umfang:** Alloy sammelt nur `altsetter` + `monitoring` (Single Node: schont die inotify-Watcher der Node). Weitere Namespaces später, siehe „Nächste Schritte".
 - **IP-Adressen** (IPv4 & IPv6) werden in Logs durch `<ip>` ersetzt.
 - **Suchbegriffe:** Query-Strings (`?...`) werden durch `?<entfernt>` ersetzt.
 - **Loki-Retention 14 Tage**, **Prometheus-Retention 15 Tage** (begrenzte Speicherdauer).
@@ -146,6 +147,8 @@ Monitoring-Volume > 85 %. Alertmanager hat vorerst nur den `null`-Receiver
 - Zwei Kolleg:innen per GitHub ergänzen (in `role_attribute_path`), später eigene
   Namespaces mit RBAC, ResourceQuotas, NetworkPolicies, Pod Security `restricted`.
 - Perzentil-Histogramme in `altsetter-api` aktivieren (s. o.).
+- Weitere Namespaces in Alloy aufnehmen (vorher `fs.inotify.max_user_instances`
+  auf der Node `debian-k3s-01` erhöhen, sonst „too many open files").
 - Satz für die Datenschutzerklärung: „Fehlermeldungen werden zur Fehlersuche
   zentral gespeichert (IP-Adressen und Suchbegriffe vorher entfernt) und nach
   14 Tagen automatisch gelöscht."
