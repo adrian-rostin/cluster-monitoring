@@ -12,7 +12,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: monitoring
   source:
-    repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+    repoURL: git@github.com:adrian-rostin/cluster-monitoring.git
     targetRevision: main
     path: manifests
     directory:
@@ -22,4 +22,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
+      - ServerSideApply=true      # saubere Übernahme bestehender Ressourcen
       - CreateNamespace=false

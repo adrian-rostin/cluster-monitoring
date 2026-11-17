@@ -16,7 +16,7 @@ spec:
       helm:
         valueFiles:
           - $values/values/kube-prometheus-stack.yaml
-    - repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+    - repoURL: git@github.com:adrian-rostin/cluster-monitoring.git
       targetRevision: main
       ref: values
   syncPolicy:

@@ -16,7 +16,7 @@ spec:
       helm:
         valueFiles:
           - $values/values/loki.yaml
-    - repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+    - repoURL: git@github.com:adrian-rostin/cluster-monitoring.git
       targetRevision: main
       ref: values
   syncPolicy:
@@ -24,4 +24,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
+      - ServerSideApply=true      # saubere Übernahme bestehender Helm-Ressourcen
       - CreateNamespace=false
