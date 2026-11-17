@@ -18,9 +18,14 @@ alloy:
     create: true
     # Alloy-Konfiguration (River-Syntax). Regexe als Backtick-Rohstrings.
     content: |-
-      // Alle Pods im Cluster als Ziele finden.
+      // Nur relevante Namespaces tailen. Auf dem Single Node würde clusterweites
+      // Tailen hunderte inotify-Watcher anlegen und das Node-Limit sprengen
+      // ("too many open files"). altsetter = Ziel, monitoring = Stack-Debugging.
       discovery.kubernetes "pods" {
         role = "pod"
+        namespaces {
+          names = ["altsetter", "monitoring"]
+        }
       }
 
       // Labels setzen und Traefik vollständig ausschließen.
