@@ -1,0 +1,26 @@
+# PodMonitor für die Altsetter-API.
+# Liegt in 'monitoring' (wird von Prometheus eingesammelt, weil
+# podMonitorSelectorNilUsesHelmValues=false), zielt per namespaceSelector
+# aber auf die Pods im Namespace 'altsetter'.
+# Scrapt Port 'management' (8081) unter /actuator/prometheus (Micrometer).
+# Die vorhandenen prometheus.io/*-Annotationen am Pod werden vom Operator
+# ignoriert – deshalb dieser PodMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: altsetter-api
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: altsetter-api
+spec:
+  namespaceSelector:
+    matchNames:
+      - altsetter
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: altsetter-api
+  podMetricsEndpoints:
+    - port: management          # benannter Container-Port 8081
+      path: /actuator/prometheus
+      interval: 30s
+      scheme: http

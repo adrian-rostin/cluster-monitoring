@@ -1,0 +1,25 @@
+# AppProject für das Monitoring (vorbereitet – noch nicht angewendet).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  description: Cluster-Monitoring (Prometheus, Loki, Alloy, Grafana)
+  sourceRepos:
+    - https://github.com/adrian-rostin/cluster-monitoring.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    # Die zusätzliche NetworkPolicy liegt in 'altsetter'
+    - server: https://kubernetes.default.svc
+      namespace: altsetter
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

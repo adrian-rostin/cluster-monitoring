@@ -1,0 +1,185 @@
+# Eigenes Grafana-Dashboard "Altsetter API" als ConfigMap.
+# Das Grafana-Sidecar liest es dank Label grafana_dashboard: "1" automatisch ein.
+# Metriknamen wurden per Port-Forward auf /actuator/prometheus verifiziert.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: altsetter-api-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Altsetter"
+data:
+  altsetter-api.json: |
+    {
+      "title": "Altsetter API",
+      "uid": "altsetter-api",
+      "tags": ["altsetter"],
+      "timezone": "Europe/Berlin",
+      "style": "dark",
+      "editable": true,
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Datenquelle",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": {},
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Verfügbarkeit (up)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "targets": [
+            { "refId": "A", "expr": "up{namespace=\"altsetter\"}", "legendFormat": "{{pod}}" }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Fehlerrate 5xx",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 } ] }
+            }
+          },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{namespace=\"altsetter\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"altsetter\"}[5m])), 1e-9)", "legendFormat": "5xx-Anteil" }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Requests/s (gesamt)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{namespace=\"altsetter\"}[5m]))", "legendFormat": "req/s" }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Requests/s nach URI",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            { "refId": "A", "expr": "sum by (uri) (rate(http_server_requests_seconds_count{namespace=\"altsetter\"}[5m]))", "legendFormat": "{{uri}}" }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Requests/s nach Status",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            { "refId": "A", "expr": "sum by (status) (rate(http_server_requests_seconds_count{namespace=\"altsetter\"}[5m]))", "legendFormat": "{{status}}" }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Latenz: Ø & Max (s)",
+          "description": "http_server_requests_seconds ist ein Summary ohne Buckets – echtes p50/p95/p99 ist nicht verfügbar. Gezeigt: Durchschnitt (rate sum/count) und Max.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 5 } } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_sum{namespace=\"altsetter\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"altsetter\"}[5m])), 1e-9)", "legendFormat": "Ø Latenz" },
+            { "refId": "B", "expr": "max(http_server_requests_seconds_max{namespace=\"altsetter\"})", "legendFormat": "Max" }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "429 Rate-Limit (req/s)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "bars", "fillOpacity": 40 }, "color": { "mode": "fixed", "fixedColor": "orange" } } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{namespace=\"altsetter\",status=\"429\"}[5m]))", "legendFormat": "429/s" }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "JVM Heap",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+          "targets": [
+            { "refId": "A", "expr": "sum by (pod) (jvm_memory_used_bytes{namespace=\"altsetter\",area=\"heap\"})", "legendFormat": "used {{pod}}" },
+            { "refId": "B", "expr": "sum by (pod) (jvm_memory_max_bytes{namespace=\"altsetter\",area=\"heap\"})", "legendFormat": "max {{pod}}" }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "JVM Threads",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+          "targets": [
+            { "refId": "A", "expr": "sum by (pod) (jvm_threads_live_threads{namespace=\"altsetter\"})", "legendFormat": "live {{pod}}" },
+            { "refId": "B", "expr": "sum by (state) (jvm_threads_states_threads{namespace=\"altsetter\"})", "legendFormat": "{{state}}" }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "DB-Connection-Pool (HikariCP)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } },
+          "targets": [
+            { "refId": "A", "expr": "sum(hikaricp_connections_active{namespace=\"altsetter\"})", "legendFormat": "aktiv" },
+            { "refId": "B", "expr": "sum(hikaricp_connections_idle{namespace=\"altsetter\"})", "legendFormat": "idle" },
+            { "refId": "C", "expr": "sum(hikaricp_connections_pending{namespace=\"altsetter\"})", "legendFormat": "wartend" },
+            { "refId": "D", "expr": "max(hikaricp_connections_max{namespace=\"altsetter\"})", "legendFormat": "max" }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Pod-Restarts (kumuliert)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "stepInterval": null } } },
+          "targets": [
+            { "refId": "A", "expr": "sum by (pod) (kube_pod_container_status_restarts_total{namespace=\"altsetter\"})", "legendFormat": "{{pod}}" }
+          ]
+        }
+      ]
+    }

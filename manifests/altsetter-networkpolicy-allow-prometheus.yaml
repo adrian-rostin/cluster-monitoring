@@ -1,0 +1,27 @@
+# ZUSÄTZLICHE NetworkPolicy im Namespace 'altsetter' (NetworkPolicies sind additiv).
+# Erlaubt Ingress aus dem Namespace 'monitoring' (Prometheus-Pods) auf den
+# Port 'management' (8081), damit das Scraping funktioniert.
+#
+# Die bestehende Policy 'altsetter-api' (nur Traefik -> http/8080) bleibt
+# UNVERÄNDERT. Diese Datei liegt als Vorschlag auch im Repo altsetter-api (k8s/).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: altsetter
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: altsetter-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Gesamter Namespace monitoring. Könnte man später auf die
+        # Prometheus-Pods einengen (podSelector), ist aber bewusst robust.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: management        # benannter Port 8081
+          protocol: TCP

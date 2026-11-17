@@ -1,0 +1,25 @@
+# vorbereitet – noch nicht angewendet
+# Wendet PodMonitor, PrometheusRule, Dashboard-ConfigMap und die zusätzliche
+# NetworkPolicy aus manifests/ an.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: altsetter-monitoring-manifests
+  namespace: argocd
+spec:
+  project: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  source:
+    repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+    targetRevision: main
+    path: manifests
+    directory:
+      recurse: true          # inkl. dashboards/
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

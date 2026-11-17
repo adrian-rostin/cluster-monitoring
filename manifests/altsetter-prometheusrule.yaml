@@ -1,0 +1,81 @@
+# Alert-Regeln für die Altsetter-API.
+# Wird von Prometheus eingesammelt (ruleSelectorNilUsesHelmValues=false).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: altsetter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: altsetter-api
+spec:
+  groups:
+    - name: altsetter.rules
+      rules:
+        # API nicht erreichbar (up == 0 länger als 2 Minuten)
+        - alert: AltsetterApiDown
+          expr: up{namespace="altsetter"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Altsetter-API nicht erreichbar"
+            description: "Ein altsetter-api-Pod liefert seit über 2 Minuten keine Metriken (up==0)."
+
+        # 5xx-Rate über 5 % (5 Minuten)
+        - alert: AltsetterApi5xxHigh
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="altsetter",status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{namespace="altsetter"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Hohe 5xx-Fehlerrate bei der Altsetter-API"
+            description: "Über 5 % der Requests sind 5xx (letzte 5 min)."
+
+        # Hohe Latenz (10 Minuten).
+        # Hinweis: http_server_requests_seconds ist ein Summary OHNE Buckets,
+        # echtes p95 ist daher nicht berechenbar. Wir alarmieren auf die
+        # DURCHSCHNITTSLATENZ. Sobald in altsetter-api Histogramme aktiv sind
+        # (management.metrics.distribution.percentiles-histogram...), kann die
+        # auskommentierte p95-Regel verwendet werden.
+        - alert: AltsetterApiLatencyHigh
+          expr: |
+            sum(rate(http_server_requests_seconds_sum{namespace="altsetter"}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{namespace="altsetter"}[5m])) > 1
+          # p95 (nach Aktivierung von Histogrammen):
+          # expr: |
+          #   histogram_quantile(0.95,
+          #     sum by (le) (rate(http_server_requests_seconds_bucket{namespace="altsetter"}[5m]))) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Hohe Latenz bei der Altsetter-API"
+            description: "Durchschnittliche Antwortzeit über 1 s, seit 10 Minuten."
+
+        # Pod-Restarts in der letzten Stunde
+        - alert: AltsetterApiRestarts
+          expr: increase(kube_pod_container_status_restarts_total{namespace="altsetter"}[1h]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Altsetter-Pod wurde neu gestartet"
+            description: "In der letzten Stunde gab es Pod-Restarts im Namespace altsetter."
+
+        # Persistent Volume (Prometheus/Loki) über 85 % voll
+        - alert: MonitoringVolumeAlmostFull
+          expr: |
+            (
+              kubelet_volume_stats_available_bytes{namespace="monitoring"}
+              /
+              kubelet_volume_stats_capacity_bytes{namespace="monitoring"}
+            ) < 0.15
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Monitoring-Volume fast voll"
+            description: "Ein PVC (Prometheus/Loki) in monitoring ist zu über 85 % belegt."

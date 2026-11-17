@@ -1,0 +1,28 @@
+# vorbereitet – noch nicht angewendet
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 93.3.1
+      helm:
+        valueFiles:
+          - $values/values/kube-prometheus-stack.yaml
+    - repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true      # große CRDs
+      - CreateNamespace=false

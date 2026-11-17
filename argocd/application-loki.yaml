@@ -1,0 +1,27 @@
+# vorbereitet – noch nicht angewendet
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  sources:
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: loki
+      targetRevision: 21.3.1
+      helm:
+        valueFiles:
+          - $values/values/loki.yaml
+    - repoURL: https://github.com/adrian-rostin/cluster-monitoring.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

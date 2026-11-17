@@ -1,0 +1,73 @@
+# Loki – Values (Logspeicher)
+# Chart: grafana-community/loki 21.3.1 (App Loki 3.7.10)
+# Hinweis: Das OSS-Loki-Chart ist nach grafana-community umgezogen
+# (grafana/loki ist jetzt das Enterprise-Chart). Namespace: monitoring
+#
+# Single Node: Monolith-Modus, Dateisystem-Storage, keine Caches/Gateway.
+# Struktur geprüft gegen values.yaml dieser Chart-Version + helm template.
+
+# In 21.3.1 heißt der Modus 'Monolithic'; 'SingleBinary' wird als Alias weiterhin
+# akzeptiert (beide aktivieren die singleBinary-Komponente).
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+
+  # TSDB, Schema v13, Dateisystem – ausdrücklich KEIN useTestSchema.
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  # Aufbewahrung 14 Tage (= 336h). Wichtig für die Datenschutzerklärung
+  # (begrenzte Speicherdauer).
+  limits_config:
+    retention_period: 336h
+
+  # Compactor muss laufen, damit die Retention auch wirklich löscht.
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+
+# Die eigentliche Loki-Instanz (ein Pod, StatefulSet)
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# Komponenten der skalierbaren/verteilten Modi aus (nicht genutzt)
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Auf einem Single Node unnötig -> aus
+gateway:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false

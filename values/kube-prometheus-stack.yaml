@@ -1,0 +1,236 @@
+# kube-prometheus-stack – Values für den k3s-Monitoring-Stack
+# Chart: prometheus-community/kube-prometheus-stack 93.3.1 (Operator v0.95.2)
+# Enthält: Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics
+# Namespace: monitoring
+
+# --- k3s-Anpassungen -------------------------------------------------------
+# Control-Plane-Teile existieren bei k3s nicht als separate scrapebare Ziele.
+# Abschalten, sonst gibt es Dauer-Alarme.
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    # Regeln für nicht vorhandene k3s-Control-Plane-Teile deaktivieren
+    etcd: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeControllerManager: false
+    kubeProxy: false
+    windows: false
+
+# --- Prometheus-Operator ---------------------------------------------------
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# --- Prometheus ------------------------------------------------------------
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 8GB
+    # Auch PodMonitors/ServiceMonitors/Rules AUSSERHALB dieses Releases einsammeln.
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    # Datenschutz: wir fügen KEINE Labels mit IP-Adressen, User-IDs oder
+    # Suchbegriffen hinzu. Micrometer-URIs sind getemplatet (z. B. /{id}).
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+# --- Alertmanager ----------------------------------------------------------
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 100Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+  # Vorerst KEIN externer Empfänger: alles läuft in den 'null'-Receiver.
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['namespace', 'alertname']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'null'
+      routes:
+        - receiver: 'null'
+          matchers:
+            - alertname = "Watchdog"
+    receivers:
+      - name: 'null'
+      # --- Discord-Empfänger (SPÄTER aktivieren) -----------------------------
+      # - name: 'discord'
+      #   discord_configs:
+      #     - webhook_url: 'https://discord.com/api/webhooks/XXXXX/YYYYY'
+      #       title: '{{ .CommonLabels.alertname }}'
+      #       message: '{{ range .Alerts }}{{ .Annotations.summary }}{{ "\n" }}{{ end }}'
+      # Danach oben in route.receiver (und ggf. im Watchdog-Route) 'discord'
+      # statt 'null' eintragen.
+      # -----------------------------------------------------------------------
+
+# --- node-exporter ---------------------------------------------------------
+# Braucht hostNetwork/hostPID/hostPath -> Namespace muss Pod Security
+# 'privileged' erlauben (siehe install.sh / README).
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 24Mi
+    limits:
+      memory: 48Mi
+
+# --- kube-state-metrics ----------------------------------------------------
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 96Mi
+
+# --- Grafana ---------------------------------------------------------------
+grafana:
+  enabled: true
+  defaultDashboardsTimezone: Europe/Berlin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # Notfallzugang: zufälliges Admin-Passwort im Secret 'grafana-admin'
+  # (wird vom install.sh erzeugt). Siehe README -> Notfallzugang.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  # GitHub-OAuth-Zugangsdaten aus Secret 'grafana-github-oauth'.
+  # Keys: GF_AUTH_GITHUB_CLIENT_ID / GF_AUTH_GITHUB_CLIENT_SECRET
+  # NIE ins Repo committen – das install.sh fragt sie ab/legt das Secret an.
+  envFromSecret: grafana-github-oauth
+
+  persistence:
+    enabled: true
+    type: pvc
+    size: 2Gi
+    storageClassName: local-path
+    accessModes:
+      - ReadWriteOnce
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - grafana.adrianrostin.de
+    path: /
+    pathType: Prefix
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.adrianrostin.de
+
+  # Login AUSSCHLIESSLICH über GitHub; nur adrian-rostin wird Admin.
+  grafana.ini:
+    server:
+      root_url: https://grafana.adrianrostin.de
+      domain: grafana.adrianrostin.de
+    auth:
+      disable_login_form: true        # kein Passwort-Login über die Website
+    auth.github:
+      enabled: true
+      allow_sign_up: true             # nötig, damit adrian beim 1. Login angelegt wird
+      scopes: user:email,read:org
+      auth_url: https://github.com/login/oauth/authorize
+      token_url: https://github.com/login/oauth/access_token
+      api_url: https://api.github.com/user
+      # Nur 'adrian-rostin' wird GrafanaAdmin, alle anderen bekommen keine Rolle.
+      role_attribute_path: "login == 'adrian-rostin' && 'GrafanaAdmin' || ''"
+      role_attribute_strict: true     # keine Rolle => Zugriff verweigert
+      allow_assign_grafana_admin: true
+    users:
+      allow_sign_up: false
+    security:
+      cookie_secure: true
+      disable_gravatar: true          # keine Anfragen an Gravatar
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+
+  # Prometheus setzt das Chart selbst als Standard-Datenquelle. Loki zusätzlich:
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      jsonData:
+        maxLines: 1000
+
+  # JVM/Micrometer-Dashboard von grafana.com (ID 4701, Revision 10).
+  # Wird beim Deploy geladen -> Grafana-Pod braucht Internet-Egress.
+  # Falls mit Micrometer/Spring Boot 4 unpassend: andere ID eintragen.
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      jvm-micrometer:
+        gnetId: 4701
+        revision: 10
+        datasource: Prometheus
+
+  # Eigene Dashboards per ConfigMap (Label grafana_dashboard: "1") werden vom
+  # Sidecar automatisch eingelesen -> siehe manifests/dashboards/altsetter-api.yaml
+  sidecar:
+    dashboards:
+      enabled: true
