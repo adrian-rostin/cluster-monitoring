@@ -3,6 +3,19 @@
 Monitoring-Stack für meinen k3s-Single-Node-Cluster: Metriken, Logs, Dashboards
 und Alerting – alles als Code und per **Argo CD (GitOps)** verwaltet.
 
+## Was dieses Projekt zeigt
+
+- **GitOps mit Argo CD**: Der komplette Stack wird deklarativ aus diesem Repo
+  deployt (Helm-Multi-Source + Values), mit `automated`-Sync und `selfHeal`.
+- **Observability-Grundlagen**: Metriken (Prometheus), Logs (Loki/Alloy),
+  Dashboards und Alerting (Alertmanager/PrometheusRule) sauber getrennt.
+- **k3s-spezifische Anpassungen**: abgeschaltete Control-Plane-Komponenten,
+  angepasste Alert-Regeln, Ressourcen-Budget für einen Single-Node.
+- **Datenschutz by design**: keine Zugriffsprotokolle, IP- und Query-String-
+  Scrubbing vor dem Speichern, begrenzte Aufbewahrung (siehe unten).
+- **Secrets außerhalb von Git**: OAuth- und Admin-Zugangsdaten liegen nur als
+  Kubernetes-Secrets im Cluster, nie im Repo.
+
 ## Was ist drin
 
 | Komponente | Zweck | Chart | Version |
@@ -167,7 +180,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
   Namespaces mit RBAC, ResourceQuotas, NetworkPolicies, Pod Security `restricted`.
 - Perzentil-Histogramme in `altsetter-api` aktivieren (s. o.).
 - Weitere Namespaces in Alloy aufnehmen (vorher `fs.inotify.max_user_instances`
-  auf der Node `debian-k3s-01` erhöhen, sonst „too many open files").
+  auf dem k3s-Node erhöhen, sonst „too many open files").
 - Satz für die Datenschutzerklärung: „Fehlermeldungen werden zur Fehlersuche
   zentral gespeichert (IP-Adressen und Suchbegriffe vorher entfernt) und nach
   14 Tagen automatisch gelöscht."

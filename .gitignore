@@ -1,5 +1,16 @@
 node_modules/
 .DS_Store
 *.tmp
+
+# Secrets / Zugangsdaten – gehören NIE ins Repo
 secrets/
 *.secret.yaml
+*.env
+.env
+kubeconfig
+*.kubeconfig
+*.key
+*.pem
+id_ed25519*
+id_rsa*
+deploykey*
