@@ -92,9 +92,33 @@ Teilschritte: `./install.sh secrets|charts|manifests`.
 ## Login / Zugriff
 
 - Grafana: **nur GitHub-Login**, kein Passwort-Formular, auch keine HTTP-Basic-Auth
-  auf der API (`auth.basic.enabled: false`). Rollen: `adrian-rostin` = GrafanaAdmin,
-  `jan-herzog` = Admin; `role_attribute_strict: true` → alle anderen werden trotz
-  gültigem GitHub-Login abgewiesen. Weitere Nutzer: in `role_attribute_path` ergänzen.
+  auf der API (`auth.basic.enabled: false`). Wer sich anmelden darf und mit welcher
+  Rolle, steht **nicht im Repo**, sondern im Cluster-Secret (siehe „Nutzer verwalten").
+  `role_attribute_strict: true` → ohne passende Rolle wird jeder Login abgewiesen.
+
+### Nutzer verwalten
+
+Die Zuordnung *GitHub-Login → Grafana-Rolle* liegt bewusst im Secret
+`grafana-github-oauth` (Key `GF_AUTH_GITHUB_ROLE_ATTRIBUTE_PATH`, via
+`envFromSecret`) – so stehen **keine Personen im Repo**. Aktuellen Stand ansehen:
+
+```bash
+kubectl -n monitoring get secret grafana-github-oauth \
+  -o jsonpath='{.data.GF_AUTH_GITHUB_ROLE_ATTRIBUTE_PATH}' | base64 -d; echo
+```
+
+Nutzer hinzufügen/ändern – den GitHub-Login ins passende `contains([...])`-Array
+aufnehmen, dann Grafana neu starten:
+
+```bash
+NEW="contains(['dein-github-login'],login) && 'GrafanaAdmin' || contains(['kollege-login','weiterer-login'],login) && 'Admin' || ''"
+kubectl -n monitoring patch secret grafana-github-oauth --type merge \
+  -p "{\"stringData\":{\"GF_AUTH_GITHUB_ROLE_ATTRIBUTE_PATH\":\"${NEW}\"}}"
+kubectl -n monitoring rollout restart deploy/kube-prometheus-stack-grafana
+```
+
+Rollen: `GrafanaAdmin` (Server-Admin), `Admin` (Org-Admin), `Editor`, `Viewer`.
+Leere Rolle (`''`) = kein Zugriff (wegen `role_attribute_strict`).
 
 ### Notfallzugang (wenn GitHub-Login nicht geht)
 
@@ -176,8 +200,8 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 - Discord-Receiver im Alertmanager aktivieren.
 - Gatus als öffentliche Statusseite `status.adrianrostin.de`.
 - Grafana Public Dashboards fürs Portfolio.
-- Zwei Kolleg:innen per GitHub ergänzen (in `role_attribute_path`), später eigene
-  Namespaces mit RBAC, ResourceQuotas, NetworkPolicies, Pod Security `restricted`.
+- Eigene Namespaces mit RBAC, ResourceQuotas, NetworkPolicies und Pod Security
+  `restricted` für weitere Teams/Workloads.
 - Perzentil-Histogramme in `altsetter-api` aktivieren (s. o.).
 - Weitere Namespaces in Alloy aufnehmen (vorher `fs.inotify.max_user_instances`
   auf dem k3s-Node erhöhen, sonst „too many open files").

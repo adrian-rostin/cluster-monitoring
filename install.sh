@@ -57,13 +57,20 @@ ensure_secrets() {
   msg "Secret 'grafana-github-oauth' (GitHub-OAuth) prüfen"
   if ! kubectl -n "$NS" get secret grafana-github-oauth >/dev/null 2>&1; then
     echo "GitHub-OAuth-App-Zugangsdaten eingeben (werden nicht angezeigt/geloggt):"
-    local cid csecret
+    local cid csecret ghadmin
     read -rp "  Client ID: " cid
     read -rsp "  Client Secret: " csecret; echo
+    read -rp "  GitHub-Login des ersten Admins (GrafanaAdmin): " ghadmin
+    # Die Rollen-Zuordnung (wer welche Rolle bekommt) liegt bewusst im Secret,
+    # nicht im Repo – so stehen keine Personen im (ggf. oeffentlichen) Code.
+    # Weitere Nutzer spaeter: Login ins contains([...])-Array aufnehmen und
+    # Grafana neu starten (siehe README, Abschnitt "Nutzer verwalten").
+    local rolepath="contains(['${ghadmin}'], login) && 'GrafanaAdmin' || ''"
     kubectl -n "$NS" create secret generic grafana-github-oauth \
       --from-literal=GF_AUTH_GITHUB_CLIENT_ID="$cid" \
-      --from-literal=GF_AUTH_GITHUB_CLIENT_SECRET="$csecret"
-    unset cid csecret
+      --from-literal=GF_AUTH_GITHUB_CLIENT_SECRET="$csecret" \
+      --from-literal=GF_AUTH_GITHUB_ROLE_ATTRIBUTE_PATH="$rolepath"
+    unset cid csecret ghadmin rolepath
   else
     echo "grafana-github-oauth existiert bereits – unverändert."
   fi
